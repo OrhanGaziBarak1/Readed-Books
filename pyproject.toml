@@ -1,0 +1,24 @@
+[project]
+name = "readedbooks"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Orhan Gazi Barak", email = "orhangazibarak@outlook.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.18.5",
+    "fastapi>=0.140.13",
+    "psycopg2-binary>=2.9.12",
+    "python-dotenv>=1.2.2",
+    "sqlmodel>=0.0.39",
+    "uvicorn>=0.52.0",
+]
+
+[project.scripts]
+readedbooks = "readedbooks:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
