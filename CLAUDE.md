@@ -54,3 +54,8 @@ src/readedbooks/
 User-facing messages (domain exception messages in `exceptions.py`, unique-constraint messages in `main.py`) should eventually be localized rather than hardcoded English strings.
 
 **Status:** decided in principle, not yet scoped. Target languages, the localization mechanism (e.g. message keys + lookup table vs. a library like `gettext`), and where translation happens (services layer vs. each protocol adapter) are not yet decided — revisit when this is prioritized.
+
+### Dynamic Filter and Pagination (planned)
+
+Use fastapi-querybuilder package for dynamic filtering and pagination.
+You can add with `uv add fastapi-querybuilder` command.   
