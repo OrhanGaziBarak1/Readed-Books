@@ -25,6 +25,7 @@ This project uses **uv** for all dependency and environment management — do no
 - No linter, formatter, or test suite is configured yet. Don't assume `ruff`, `black`, `mypy`, or `pytest` are available until they're added as dev dependencies.
 - Requires Python 3.14 (see `.python-version`).
 - PostgreSQL is wired up via SQLModel + Alembic (`alembic/`, `src/readedbooks/db.py`).
+- Shared services layer (`exceptions.py`, `services.py`) is implemented — see below.
 
 ## Architecture plan: shared services layer
 
@@ -35,23 +36,23 @@ src/readedbooks/
 ├── main.py          # FastAPI app: routes only, translate HTTP <-> services.py
 ├── mcp_server.py     # FastMCP app: tools only, translate MCP <-> services.py (not yet built)
 ├── services.py       # Shared DB/business logic — no FastAPI or FastMCP imports
-├── exceptions.py      # Plain Python exceptions (e.g. NotFoundError) — no HTTP knowledge
+├── exceptions.py      # Plain Python exceptions (e.g. NotFoundError) + their HTTP-agnostic message logic — no HTTP knowledge
 ├── models.py
 └── db.py
 ```
 
-- `exceptions.py` holds plain-Python domain exceptions (e.g. `NotFoundError`) with no HTTP or MCP awareness.
+- `exceptions.py` holds plain-Python domain exceptions (`NotFoundError`) with no HTTP or MCP awareness, plus the `UNIQUE_CONSTRAINT_MESSAGES` mapping and `integrity_error_message()` helper used to turn a raw `sqlalchemy.exc.IntegrityError` into a user-facing message.
 - `services.py` holds the actual query/mutation logic and raises those domain exceptions (e.g. `get_book` raises `NotFoundError` if missing).
-- `main.py` becomes thin route handlers that call `services.py`, plus one global `@app.exception_handler(NotFoundError)` that maps the domain exception to a 404 for every route at once — no more per-route `if x is None: raise HTTPException(...)`.
+- `main.py` is thin route handlers that call `services.py`, plus two global handlers: `@app.exception_handler(NotFoundError)` (→ 404) and `@app.exception_handler(IntegrityError)` (→ 409, via `integrity_error_message()`). No more per-route `if x is None: raise HTTPException(...)`.
 - `mcp_server.py` (not built yet) will call the same `services.py` functions and translate `NotFoundError` into whatever error shape FastMCP tools use.
 
-**Why:** avoids duplicating logic between the API and MCP tools, and avoids MCP tools making self-referential HTTP calls. A single domain exception (e.g. `NotFoundError`) is defined once and translated independently by each protocol layer (HTTP status vs. MCP tool error).
+**Why:** avoids duplicating logic between the API and MCP tools, and avoids MCP tools making self-referential HTTP calls. A single domain exception (e.g. `NotFoundError`) is defined once and translated independently by each protocol layer (HTTP status vs. MCP tool error). Exception *handlers* stay protocol-specific (in `main.py` for HTTP) since they can't be shared with `mcp_server.py`'s own translation layer.
 
-**Status:** decided, not yet implemented. `main.py` currently still has the DB logic inline and per-route `HTTPException` checks.
+**Status:** `exceptions.py` and `services.py` are implemented — `main.py` route bodies now just call `services.py`. `mcp_server.py` is still not built.
 
 ### Localization (planned)
 
-User-facing messages (domain exception messages in `exceptions.py`, unique-constraint messages in `main.py`) should eventually be localized rather than hardcoded English strings.
+User-facing messages (domain exception messages and unique-constraint messages, both in `exceptions.py`) should eventually be localized rather than hardcoded English strings.
 
 **Status:** decided in principle, not yet scoped. Target languages, the localization mechanism (e.g. message keys + lookup table vs. a library like `gettext`), and where translation happens (services layer vs. each protocol adapter) are not yet decided — revisit when this is prioritized.
 
