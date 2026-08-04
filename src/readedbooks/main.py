@@ -15,6 +15,7 @@ from readedbooks.models import (
     BookCreate,
     BookUpdate,
 )
+from fastapi_querybuilder import QueryBuilder
 
 app = FastAPI()
 
@@ -34,8 +35,13 @@ OffsetQuery = Annotated[int, Query(ge=0)]
 
 
 @app.get("/books")
-def list_books(session: SessionDep, limit: LimitQuery = 20, offset: OffsetQuery = 0) -> list[Book]:
-    return services.list_books(session, limit, offset)
+def list_books(
+    session: SessionDep,
+    query=QueryBuilder(Book),
+    limit: LimitQuery = 20,
+    offset: OffsetQuery = 0,
+) -> list[Book]:
+    return services.list_books(session, query, limit, offset)
 
 
 @app.get("/books/{book_id}")
@@ -59,8 +65,12 @@ def delete_book(session: SessionDep, book_id: int) -> None:
 
 
 @app.get("/authors")
-def list_authors(session: SessionDep, limit: LimitQuery = 20, offset: OffsetQuery = 0) -> list[Author]:
-    return services.list_authors(session, limit, offset)
+def list_authors(
+    session: SessionDep,
+    query= QueryBuilder(Author),
+    limit: LimitQuery = 20,
+    offset: OffsetQuery = 0,) -> list[Author]:
+    return services.list_authors(session, query, limit, offset)
 
 
 @app.get("/authors/{author_id}")

@@ -1,3 +1,4 @@
+from sqlalchemy import Select
 from sqlmodel import Session, select
 
 from readedbooks.exceptions import NotFoundError
@@ -10,8 +11,9 @@ from readedbooks.models import (
 )
 
 
-def list_books(session: Session, limit: int, offset: int) -> list[Book]:
-    return list(session.exec(select(Book).offset(offset).limit(limit)).all())
+def list_books(session: Session, query: Select, limit: int, offset: int) -> list[Book]:
+    result = session.execute(query.offset(offset).limit(limit))
+    return list(result.scalars().all())
 
 def get_book(session: Session, book_id: int) -> Book:
     book = session.get(Book, book_id)
@@ -55,8 +57,9 @@ def delete_book(session: Session, book_id: int) -> None:
     session.delete(db_book)
     session.commit()
 
-def list_authors(session: Session, limit: int, offset: int) -> list[Author]:
-    return list(session.exec(select(Author).offset(offset).limit(limit)).all())
+def list_authors(session: Session, query:Select, limit: int, offset: int) -> list[Author]:
+    result = session.execute(query.offset(offset).limit(limit))
+    return list(result.scalars().all())
 
 def get_author(session: Session, author_id: int) -> Author:    
     author = session.get(Author, author_id)
