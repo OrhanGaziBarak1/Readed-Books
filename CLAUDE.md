@@ -49,14 +49,3 @@ src/readedbooks/
 **Why:** avoids duplicating logic between the API and MCP tools, and avoids MCP tools making self-referential HTTP calls. A single domain exception (e.g. `NotFoundError`) is defined once and translated independently by each protocol layer (HTTP status vs. MCP tool error). Exception *handlers* stay protocol-specific (in `main.py` for HTTP) since they can't be shared with `mcp_server.py`'s own translation layer.
 
 **Status:** `exceptions.py` and `services.py` are implemented — `main.py` route bodies now just call `services.py`. `mcp_server.py` is still not built.
-
-### Localization (planned)
-
-User-facing messages (domain exception messages and unique-constraint messages, both in `exceptions.py`) should eventually be localized rather than hardcoded English strings.
-
-**Status:** decided in principle, not yet scoped. Target languages, the localization mechanism (e.g. message keys + lookup table vs. a library like `gettext`), and where translation happens (services layer vs. each protocol adapter) are not yet decided — revisit when this is prioritized.
-
-### Dynamic Filter and Pagination (planned)
-
-Use fastapi-querybuilder package for dynamic filtering and pagination.
-You can add with `uv add fastapi-querybuilder` command.   
