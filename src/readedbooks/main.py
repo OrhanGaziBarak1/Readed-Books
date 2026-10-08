@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from readedbooks import services
-from readedbooks.db import get_session
+from readedbooks.db import engine, get_session
 from readedbooks.exceptions import NotFoundError, integrity_error_message
 from readedbooks.models import (
     Author,
@@ -17,8 +17,11 @@ from readedbooks.models import (
     BookUpdate,
 )
 from fastapi_querybuilder import QueryBuilder
+from fastmcp import FastMCP
 
 app = FastAPI()
+mcp_app = FastMCP("ReadedBooksMCPServer",
+              instructions="Provides tools manage my readed books database.")
 
 
 @app.exception_handler(IntegrityError)
@@ -45,6 +48,13 @@ def list_books(
     return services.list_books(session, query, limit, offset)
 
 
+@mcp_app.tool()
+def list_books_tool(limit: int = 20, offset: int = 0) -> list[Book]:
+    """List books in the readedbooks database."""
+    with Session(engine) as session:
+        return services.list_books(session, select(Book), limit, offset)
+
+
 @app.post("/books/import")
 def import_books(session: SessionDep, file: UploadFile) -> BookImportResult:
     return services.import_books_from_csv(session, file.file)
@@ -54,20 +64,40 @@ def import_books(session: SessionDep, file: UploadFile) -> BookImportResult:
 def get_book(session: SessionDep, book_id: int) -> Book:
     return services.get_book(session, book_id)
 
+@mcp_app.tool()
+def get_book_tool(id: int) -> Book:
+    with Session(engine) as session:
+        return services.get_book(session, id)
+
 
 @app.post("/books", status_code=201)
 def create_book(session: SessionDep, book: BookCreate) -> Book:
     return services.create_book(session, book)
+
+@mcp_app.tool()
+def create_book_tool(book: BookCreate) -> Book:
+    with Session(engine) as session:
+        return services.create_book(session, book)
 
 
 @app.patch("/books/{book_id}")
 def update_book(session: SessionDep, book_id: int, book: BookUpdate) -> Book:
     return services.update_book(session, book_id, book)
 
+@mcp_app.tool()
+def update_book_tool(id: int, book: BookUpdate) -> Book:
+    with Session(engine) as session:
+        return services.update_book(session, id, book)
+
 
 @app.delete("/books/{book_id}", status_code=204)
 def delete_book(session: SessionDep, book_id: int) -> None:
     services.delete_book(session, book_id)
+
+@mcp_app.tool()
+def delete_book_tool(id: int) -> None:
+    with Session(engine) as session:
+        return services.delete_book(session, id)
 
 
 @app.get("/authors")
@@ -78,22 +108,52 @@ def list_authors(
     offset: OffsetQuery = 0,) -> list[Author]:
     return services.list_authors(session, query, limit, offset)
 
+@mcp_app.tool()
+def list_authors_tool(limit: int = 20, offset: int = 0) -> list[Author]:
+    """List authors in the readedbooks database."""
+    with Session(engine) as session:
+        return services.list_authors(session, select(Author), limit, offset)
+
 
 @app.get("/authors/{author_id}")
 def get_author(session: SessionDep, author_id: int) -> Author:
     return services.get_author(session, author_id)
+
+@mcp_app.tool()
+def get_author_with_id(id: int) -> Author:
+    """Get a single author by id."""
+    with Session(engine) as session:
+        return services.get_author(session, id)
 
 
 @app.post("/authors", status_code=201)
 def create_author(session: SessionDep, author: AuthorCreateUpdate) -> Author:
     return services.create_author(session, author)
 
+@mcp_app.tool()
+def create_author_tool(name: str) -> Author:
+    """Create a new author."""
+    with Session(engine) as session:
+        return services.create_author(session, AuthorCreateUpdate(name=name))
+
 
 @app.patch("/authors/{author_id}")
 def update_author(session: SessionDep, author_id: int, author: AuthorCreateUpdate) -> Author:
     return services.update_author(session, author_id, author)
 
+@mcp_app.tool()
+def update_author_tool(id: int, name: str) -> Author:
+    """Update an existing author's name."""
+    with Session(engine) as session:
+        return services.update_author(session, id, AuthorCreateUpdate(name=name))
+
 
 @app.delete("/authors/{author_id}", status_code=204)
 def delete_author(session: SessionDep, author_id: int) -> None:
     services.delete_author(session, author_id)
+
+@mcp_app.tool()
+def delete_author_tool(id: int) -> None:
+    """Delete an author by id."""
+    with Session(engine) as session:
+        services.delete_author(session, id)

@@ -1,3 +1,4 @@
+from pydantic import field_serializer
 from sqlmodel import Field, SQLModel, UniqueConstraint
 from sqlalchemy import Column, ForeignKey, Integer
 from enum import Enum
@@ -36,8 +37,16 @@ class Book(SQLModel, table=True):
     created_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
+        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
     )
+
+    @field_serializer("created_at", "updated_at")
+    def _serialize_as_utc(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
 
 class BookCreate(SQLModel):
     name: str
