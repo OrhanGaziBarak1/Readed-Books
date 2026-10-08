@@ -1,4 +1,5 @@
 from sqlmodel import Field, SQLModel, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Integer
 from enum import Enum
 from datetime import datetime, timezone
 
@@ -26,7 +27,10 @@ class Book(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
     length: int
-    author_id: int | None = Field(default=None, foreign_key="author.id")
+    author_id: int | None = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("author.id", name="fk_book_author_id"), nullable=True),
+    )
     status: Status
     language: Language
     created_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -48,3 +52,12 @@ class BookUpdate(SQLModel):
     author_id: int | None = None
     status: Status | None = None
     language: Language | None = None
+
+class BookImportError(SQLModel):
+    row: int
+    message: str
+
+class BookImportResult(SQLModel):
+    created: int
+    skipped: int
+    errors: list[BookImportError]

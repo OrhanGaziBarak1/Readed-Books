@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
@@ -13,6 +13,7 @@ from readedbooks.models import (
     AuthorCreateUpdate,
     Book,
     BookCreate,
+    BookImportResult,
     BookUpdate,
 )
 from fastapi_querybuilder import QueryBuilder
@@ -42,6 +43,11 @@ def list_books(
     offset: OffsetQuery = 0,
 ) -> list[Book]:
     return services.list_books(session, query, limit, offset)
+
+
+@app.post("/books/import")
+def import_books(session: SessionDep, file: UploadFile) -> BookImportResult:
+    return services.import_books_from_csv(session, file.file)
 
 
 @app.get("/books/{book_id}")
