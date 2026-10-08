@@ -13,6 +13,7 @@ from readedbooks.models import (
     BookCreate,
     BookImportError,
     BookImportResult,
+    BookRead,
     BookUpdate,
     Language,
     Status,
@@ -120,6 +121,34 @@ def delete_author(session: Session, author_id: int) -> None:
         raise NotFoundError(f"Author not found with id {author_id}")
     session.delete(db_author)
     session.commit()
+
+def to_book_read(session: Session, book: Book) -> BookRead:
+    author = session.get(Author, book.author_id)
+    return BookRead(
+        id=book.id,
+        name=book.name,
+        length=book.length,
+        author_name=author.name if author else None,
+        status=book.status,
+        language=book.language,
+        created_at=book.created_at,
+        updated_at=book.updated_at,
+    )
+
+def get_author_by_name(session: Session, name: str) -> Author:
+    author = session.exec(select(Author).where(Author.name == name)).first()
+    if author is None:
+        raise NotFoundError(f"Author not found with name {name}")
+    return author
+
+def get_book_by_name(session: Session, name: str, author_name: str) -> Book:
+    author = get_author_by_name(session, author_name)
+    book = session.exec(
+        select(Book).where(Book.name == name, Book.author_id == author.id)
+    ).first()
+    if book is None:
+        raise NotFoundError(f"Book not found with name {name!r} for author {author_name!r}")
+    return book
 
 def get_or_create_author(session: Session, name: str) -> Author:
     author = session.exec(select(Author).where(Author.name == name)).first()

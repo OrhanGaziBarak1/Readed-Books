@@ -22,6 +22,13 @@ class Author(SQLModel, table=True):
 class AuthorCreateUpdate(SQLModel):
     name: str
 
+def _serialize_datetime_as_utc(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
 class Book(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("name", "author_id", name="uq_book_name_author_id"),)
 
@@ -42,11 +49,21 @@ class Book(SQLModel, table=True):
 
     @field_serializer("created_at", "updated_at")
     def _serialize_as_utc(self, value: datetime | None) -> str | None:
-        if value is None:
-            return None
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.isoformat()
+        return _serialize_datetime_as_utc(value)
+
+class BookRead(SQLModel):
+    id: int | None
+    name: str
+    length: int
+    author_name: str | None
+    status: Status
+    language: Language
+    created_at: datetime | None
+    updated_at: datetime | None
+
+    @field_serializer("created_at", "updated_at")
+    def _serialize_as_utc(self, value: datetime | None) -> str | None:
+        return _serialize_datetime_as_utc(value)
 
 class BookCreate(SQLModel):
     name: str
