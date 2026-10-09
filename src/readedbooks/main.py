@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import Field
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
@@ -17,6 +18,7 @@ from readedbooks.models import (
     BookRead,
     BookUpdate,
     Language,
+    Page,
     Status,
 )
 from fastapi_querybuilder import QueryBuilder
@@ -52,11 +54,25 @@ def list_books(
 
 
 @mcp_app.tool()
-def list_books_tool(limit: int = 20, offset: int = 0) -> list[BookRead]:
-    """List books in the readedbooks database."""
+def list_books_tool(
+    name: str | None = None,
+    author_name: str | None = None,
+    status: Status | None = None,
+    language: Language | None = None,
+    page: Annotated[int, Field(ge=1)] = 1,
+    page_size: Annotated[int, Field(ge=1, le=100)] = 20,
+) -> Page[BookRead]:
+    """List books, optionally filtered. Every filter is optional and filters combine with AND.
+    `name` and `author_name` are partial, case-insensitive matches. The result is paginated:
+    `items` holds the books on the requested `page` (1-based), `count` is how many items this
+    page holds, `total` is how many books match the filters overall, and `total_pages` is the
+    number of pages at this `page_size`. If `page` is past `total_pages`, `items` is empty;
+    request the next page by increasing `page`."""
     with Session(engine) as session:
-        books = services.list_books(session, select(Book), limit, offset)
-        return [services.to_book_read(session, book) for book in books]
+        query = services.build_books_query(name, author_name, status, language)
+        return services.paginate(
+            session, Book, query, page, page_size, lambda book: services.to_book_read(session, book)
+        )
 
 
 @app.post("/books/import")
@@ -67,13 +83,6 @@ def import_books(session: SessionDep, file: UploadFile) -> BookImportResult:
 @app.get("/books/{book_id}")
 def get_book(session: SessionDep, book_id: int) -> Book:
     return services.get_book(session, book_id)
-
-@mcp_app.tool()
-def get_book_tool(name: str, author_name: str) -> BookRead:
-    """Get a single book by its name and its author's name."""
-    with Session(engine) as session:
-        book = services.get_book_by_name(session, name, author_name)
-        return services.to_book_read(session, book)
 
 
 @app.post("/books", status_code=201)
@@ -132,21 +141,24 @@ def list_authors(
     return services.list_authors(session, query, limit, offset)
 
 @mcp_app.tool()
-def list_authors_tool(limit: int = 20, offset: int = 0) -> list[Author]:
-    """List authors in the readedbooks database."""
+def list_authors_tool(
+    name: str | None = None,
+    page: Annotated[int, Field(ge=1)] = 1,
+    page_size: Annotated[int, Field(ge=1, le=100)] = 20,
+) -> Page[Author]:
+    """List authors, optionally filtered. `name` is an optional partial, case-insensitive match.
+    The result is paginated: `items` holds the authors on the requested `page` (1-based),
+    `count` is how many items this page holds, `total` is how many authors match the filter
+    overall, and `total_pages` is the number of pages at this `page_size`. If `page` is past
+    `total_pages`, `items` is empty; request the next page by increasing `page`."""
     with Session(engine) as session:
-        return services.list_authors(session, select(Author), limit, offset)
+        query = services.build_authors_query(name)
+        return services.paginate(session, Author, query, page, page_size, lambda author: author)
 
 
 @app.get("/authors/{author_id}")
 def get_author(session: SessionDep, author_id: int) -> Author:
     return services.get_author(session, author_id)
-
-@mcp_app.tool()
-def get_author_tool(name: str) -> Author:
-    """Get a single author by name."""
-    with Session(engine) as session:
-        return services.get_author_by_name(session, name)
 
 
 @app.post("/authors", status_code=201)

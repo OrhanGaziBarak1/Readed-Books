@@ -1,9 +1,11 @@
-from typing import IO
+import math
+from typing import IO, Any, Callable
 
 import pandas as pd
 from sqlalchemy import Select
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, func, select
 
 from readedbooks.exceptions import NotFoundError
 from readedbooks.models import (
@@ -16,7 +18,9 @@ from readedbooks.models import (
     BookRead,
     BookUpdate,
     Language,
+    Page,
     Status,
+    T,
 )
 
 
@@ -149,6 +153,61 @@ def get_book_by_name(session: Session, name: str, author_name: str) -> Book:
     if book is None:
         raise NotFoundError(f"Book not found with name {name!r} for author {author_name!r}")
     return book
+
+def _contains_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+def build_books_query(
+    name: str | None = None,
+    author_name: str | None = None,
+    status: Status | None = None,
+    language: Language | None = None,
+) -> Select:
+    query = select(Book)
+    if name is not None:
+        query = query.where(Book.name.ilike(_contains_pattern(name), escape="\\"))
+    if author_name is not None:
+        query = query.join(Author, Book.author_id == Author.id).where(
+            Author.name.ilike(_contains_pattern(author_name), escape="\\")
+        )
+    if status is not None:
+        query = query.where(Book.status == status)
+    if language is not None:
+        query = query.where(Book.language == language)
+    return query
+
+def build_authors_query(name: str | None = None) -> Select:
+    query = select(Author)
+    if name is not None:
+        query = query.where(Author.name.ilike(_contains_pattern(name), escape="\\"))
+    return query
+
+def count_rows(session: Session, query: Select) -> int:
+    return session.exec(select(func.count()).select_from(query.subquery())).one()
+
+def paginate(
+    session: Session,
+    model: type[SQLModel],
+    query: Select,
+    page: int,
+    page_size: int,
+    to_item: Callable[[Any], T],
+) -> Page[T]:
+    # Offset pagination is only stable with a deterministic order, so it is applied here
+    # (by primary key) instead of being left to every caller to remember.
+    ordered = query.order_by(*sa_inspect(model).primary_key)
+    total = count_rows(session, query)
+    rows = session.execute(ordered.offset((page - 1) * page_size).limit(page_size)).scalars().all()
+    items = [to_item(row) for row in rows]
+    return Page(
+        items=items,
+        page=page,
+        page_size=page_size,
+        count=len(items),
+        total=total,
+        total_pages=math.ceil(total / page_size),
+    )
 
 def get_or_create_author(session: Session, name: str) -> Author:
     author = session.exec(select(Author).where(Author.name == name)).first()

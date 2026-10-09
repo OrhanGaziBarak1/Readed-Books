@@ -1,8 +1,11 @@
-from pydantic import field_serializer
+from pydantic import BaseModel, field_serializer
 from sqlmodel import Field, SQLModel, UniqueConstraint
 from sqlalchemy import Column, ForeignKey, Integer
 from enum import Enum
 from datetime import datetime, timezone
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
 
 class Language(str, Enum):
     TR = 'Turkish'
@@ -64,6 +67,14 @@ class BookRead(SQLModel):
     @field_serializer("created_at", "updated_at")
     def _serialize_as_utc(self, value: datetime | None) -> str | None:
         return _serialize_datetime_as_utc(value)
+
+class Page(BaseModel, Generic[T]):
+    items: list[T]
+    page: int
+    page_size: int
+    count: int
+    total: int
+    total_pages: int
 
 class BookCreate(SQLModel):
     name: str
