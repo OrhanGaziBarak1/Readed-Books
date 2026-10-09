@@ -74,16 +74,28 @@ If an author name doesn't match an existing one, it's created automatically. A f
 
 ## MCP Tools
 
-Tools usable conversationally from Claude Desktop (or any other MCP client). Book and author tools work by **name** (`Book.name` + `Author.name`, `Author.name`) rather than by id, since the user doesn't know ids.
+Tools usable conversationally from Claude Desktop (or any other MCP client). Book and author tools work by **name** (`Book.name` + `Author.name`, `Author.name`) rather than by id, since the user doesn't know ids. Update and delete match the name exactly; the list tools match partially and case-insensitively.
 
-- `list_books_tool`, `get_book_tool`, `create_book_tool`, `update_book_tool`, `delete_book_tool`
-- `list_authors_tool`, `get_author_tool`, `create_author_tool`, `update_author_tool`, `delete_author_tool`
+- `list_books_tool` (optional filters: `name`, `author_name`, `status`, `language`), `create_book_tool`, `update_book_tool`, `delete_book_tool`
+- `list_authors_tool` (optional filter: `name`), `create_author_tool`, `update_author_tool`, `delete_author_tool`
 
-Tools that return books use a `BookRead` schema with `author_name` instead of `author_id`.
+Both list tools are paginated (`page`, `page_size` up to 100) and return a `Page` object: `items`, `page`, `page_size`, `count`, `total`, `total_pages`. Books in `items` use a `BookRead` schema with `author_name` instead of `author_id`.
 
 ### Connecting Claude Desktop
 
-Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config, or the connector-adding screen in the UI):
+Claude Desktop reads its MCP servers from a file called `claude_desktop_config.json`. Its location depends on the OS:
+
+| OS | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` (usually `C:\Users\<you>\AppData\Roaming\Claude\claude_desktop_config.json`) |
+| Linux | `~/.config/Claude/claude_desktop_config.json` (or `$XDG_CONFIG_HOME/Claude/...` if that variable is set) |
+
+You can also open it from the app: **Settings → Developer → Edit Config**. If the file doesn't exist yet, launch Claude Desktop once so it creates it.
+
+> The macOS path is the one verified for this project. The Windows and Linux paths come from public setup guides and were not tested here. The [official Linux guide](https://code.claude.com/docs/en/desktop-linux) doesn't state where the config file lives, so if `~/.config/Claude/claude_desktop_config.json` doesn't exist on your machine, use **Settings → Developer → Edit Config** to find the real location.
+
+If the file already has other keys (e.g. `preferences`), don't replace it. Add only the `readedbooks` entry inside `mcpServers` (create `mcpServers` if it's missing):
 
 ```json
 {
@@ -92,10 +104,10 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
       "command": "/path/to/uv",
       "args": [
         "run",
-        "--project", "/path/to/readed-book",
+        "--project", "/path/to/readedBooks",
         "--with", "fastmcp",
-        "--with-editable", "/path/to/readed-book",
-        "fastmcp", "run", "/path/to/readed-book/src/readedbooks/main.py:mcp_app"
+        "--with-editable", "/path/to/readedBooks",
+        "fastmcp", "run", "/path/to/readedBooks/src/readedbooks/main.py:mcp_app"
       ],
       "env": {
         "DATABASE_URL": "postgresql://user:password@localhost:5432/dbname"
@@ -105,9 +117,14 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 }
 ```
 
-Find the full path to `uv` with `which uv` — Claude Desktop's PATH can differ from your terminal's. The `env` block is required because Claude Desktop launches the process from its own working directory, not the project directory where `.env` lives.
+Replace the placeholders:
 
-After configuring, fully quit Claude Desktop (Cmd+Q) and reopen it.
+- **`/path/to/uv`**: the full path to `uv`. Find it with `which uv` (macOS/Linux) or `where uv` (Windows). Claude Desktop's PATH can differ from your terminal's, so a bare `uv` may not resolve.
+- **`/path/to/readedBooks`**: the absolute path of this repository.
+- **Windows paths in JSON**: use forward slashes (`C:/Users/you/readedBooks`) or double every backslash (`C:\\Users\\you\\readedBooks`). A single backslash is invalid JSON.
+- **`env.DATABASE_URL`**: required, because Claude Desktop launches the process from its own working directory, not the project directory where `.env` lives. This file stores your database password in plain text, so don't commit or share it.
+
+After saving, fully quit Claude Desktop and reopen it: `Cmd+Q` on macOS; on Windows exit it from the system tray icon, since closing the window may only minimize it; on Linux quit the app and start it again with `claude-desktop`.
 
 ### Standalone testing
 
@@ -124,4 +141,4 @@ tail -f ~/Library/Logs/Claude/mcp-server-readedbooks.log
 
 ## Architecture
 
-For detailed architecture notes, design decisions, and open TODOs, see [CLAUDE.md](./CLAUDE.md).
+For detailed architecture notes, design decisions, see [CLAUDE.md](./CLAUDE.md).
